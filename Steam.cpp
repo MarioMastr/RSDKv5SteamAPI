@@ -196,7 +196,7 @@ bool Steam::InitAPI()
 
     if (!SteamAPI_Init())
     {
-        // DisplayError("Failed to initialise the Steam API.");
+        RSDK.PrintLog(PRINT_NORMAL, "Failed to initialise the Steam API.");
 #if STEAM_API_NODLL
         SetCurrentDirectoryA(oldWorkingDirectory);
 #endif
