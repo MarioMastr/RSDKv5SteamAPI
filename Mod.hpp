@@ -15,7 +15,7 @@ extern "C"
 #endif
 #endif
 
-#ifdef __WIN32
+#ifdef _WIN32
 #define DisplayError(message) MessageBoxA(NULL, message, "RSDKv5SteamAPI Error", MB_ICONERROR);
 #endif
 
