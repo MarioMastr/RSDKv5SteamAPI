@@ -30,7 +30,6 @@ install_hook_name(SetRichPresence, void, int32 id, String* message)
 
     Steam::SetPresence(buffer);
 }
-
 install_hook_name(CheckDLC, bool32, uint8 id)
 {
     if (id >= 0 && id <= 8)
