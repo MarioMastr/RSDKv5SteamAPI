@@ -174,7 +174,7 @@ bool Steam::CheckDLCOwnership(uint8 id)
 bool Steam::InitAPI()
 {
 #if STEAM_API_NODLL
-    auto oldWorkingDirectory = fs::current_path();
+    fs::path oldWorkingDirectory = fs::current_path();
 
     String pathAsString;
     Mod.GetModPath("RSDKv5SteamAPI", &pathAsString);
