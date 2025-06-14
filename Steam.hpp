@@ -1,13 +1,13 @@
 #pragma once
 #include "Mod.hpp"
-#define STEAM_API_NODLL 0
+#define STEAM_API_NODLL 1
 
-#ifdef _AMD64_
+#if defined(_AMD64_)
 #define STEAM_DLL_NAME "steam_api64.dll"
-#else
-#ifdef _X86_
+#elif defined(_X86_)
 #define STEAM_DLL_NAME "steam_api.dll"
-#endif
+#elif defined(__APPLE__)
+#define STEAM_DLL_NAME "libsteam_api.dylib"
 #endif
 
 namespace Steam

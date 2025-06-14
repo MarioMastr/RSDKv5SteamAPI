@@ -22,3 +22,14 @@ extern "C"
 extern void* ModHandle;
 
 void CheckDLCs();
+
+#if defined(_WIN32)
+#include "framework.h"
+#define PROC_TYPE HMODULE
+#elif defined(__APPLE__)
+#include <dlfcn.h>
+#define PROC_TYPE void *
+#endif
+
+PROC_TYPE getLibrary(const char *fileName);
+void *getSymbol(PROC_TYPE handle, const char *symbolName);

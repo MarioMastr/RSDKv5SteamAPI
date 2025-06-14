@@ -7,8 +7,10 @@
 #pragma warning(push)
 #pragma warning(disable : 4819)
 #include <steam_api.h>
+#include <filesystem>
 #pragma warning(pop)
 
+namespace fs = std::filesystem;
 
 class SteamCallbacks
 {
@@ -35,21 +37,21 @@ void SteamCallbacks::GameOverlayActivated(GameOverlayActivated_t* pCallback)
 }
 
 #if STEAM_API_NODLL
-HMODULE steamAPIHandle = nullptr;
+PROC_TYPE steamAPIHandle = nullptr;
 
-S_API bool S_CALLTYPE SteamAPI_Init()
+S_API ESteamAPIInitResult S_CALLTYPE SteamAPI_InitFlat(SteamErrMsg *errMsg)
 {
     if (steamAPIHandle) {
-        void* address = GetProcAddress(steamAPIHandle, "SteamAPI_Init");
-        return ((bool(S_CALLTYPE*)())(address))();
+        void* address = getSymbol(steamAPIHandle, "SteamAPI_InitFlat");
+        return ((ESteamAPIInitResult(S_CALLTYPE *)(SteamErrMsg *errMsg))(address))(errMsg);
     }
-    return false;
+    return k_ESteamAPIInitResult_FailedGeneric;
 }
 
 S_API void S_CALLTYPE SteamAPI_Shutdown()
 {
     if (steamAPIHandle) {
-        void* address = GetProcAddress(steamAPIHandle, "SteamAPI_Shutdown");
+        void* address = getSymbol(steamAPIHandle, "SteamAPI_Shutdown");
         return ((void(S_CALLTYPE*)())(address))();
     }
 }
@@ -57,7 +59,7 @@ S_API void S_CALLTYPE SteamAPI_Shutdown()
 S_API void S_CALLTYPE SteamAPI_RunCallbacks()
 {
     if (steamAPIHandle) {
-        void* address = GetProcAddress(steamAPIHandle, "SteamAPI_RunCallbacks");
+        void* address = getSymbol(steamAPIHandle, "SteamAPI_RunCallbacks");
         return ((void(S_CALLTYPE*)())(address))();
     }
 }
@@ -65,7 +67,7 @@ S_API void S_CALLTYPE SteamAPI_RunCallbacks()
 S_API bool S_CALLTYPE SteamAPI_IsSteamRunning()
 {
     if (steamAPIHandle) {
-        void* address = GetProcAddress(steamAPIHandle, "SteamAPI_IsSteamRunning");
+        void* address = getSymbol(steamAPIHandle, "SteamAPI_IsSteamRunning");
         return ((bool(S_CALLTYPE*)())(address))();
     }
     return false;
@@ -74,7 +76,7 @@ S_API bool S_CALLTYPE SteamAPI_IsSteamRunning()
 S_API HSteamPipe SteamAPI_GetHSteamPipe()
 {
     if (steamAPIHandle) {
-        void* address = GetProcAddress(steamAPIHandle, "SteamAPI_GetHSteamPipe");
+        void* address = getSymbol(steamAPIHandle, "SteamAPI_GetHSteamPipe");
         return ((HSteamPipe(S_CALLTYPE*)())(address))();
     }
     return 0;
@@ -83,7 +85,7 @@ S_API HSteamPipe SteamAPI_GetHSteamPipe()
 S_API HSteamUser SteamAPI_GetHSteamUser()
 {
     if (steamAPIHandle) {
-        void* address = GetProcAddress(steamAPIHandle, "SteamAPI_GetHSteamUser");
+        void* address = getSymbol(steamAPIHandle, "SteamAPI_GetHSteamUser");
         return ((HSteamUser(S_CALLTYPE*)())(address))();
     }
     return 0;
@@ -92,7 +94,7 @@ S_API HSteamUser SteamAPI_GetHSteamUser()
 S_API void* S_CALLTYPE SteamInternal_ContextInit(void* pContextInitData)
 {
     if (steamAPIHandle) {
-        void* address = GetProcAddress(steamAPIHandle, "SteamInternal_ContextInit");
+        void* address = getSymbol(steamAPIHandle, "SteamInternal_ContextInit");
         return ((void* (S_CALLTYPE*)(void* pContextInitData))(address))(pContextInitData);
     }
     return nullptr;
@@ -101,7 +103,7 @@ S_API void* S_CALLTYPE SteamInternal_ContextInit(void* pContextInitData)
 S_API void* S_CALLTYPE SteamInternal_CreateInterface(const char* ver)
 {
     if (steamAPIHandle) {
-        void* address = GetProcAddress(steamAPIHandle, "SteamInternal_CreateInterface");
+        void* address = getSymbol(steamAPIHandle, "SteamInternal_CreateInterface");
         return ((void* (S_CALLTYPE*)(const char* ver))(address))(ver);
     }
     return nullptr;
@@ -110,7 +112,7 @@ S_API void* S_CALLTYPE SteamInternal_CreateInterface(const char* ver)
 S_API void S_CALLTYPE SteamAPI_RegisterCallback(class CCallbackBase* pCallback, int iCallback)
 {
     if (steamAPIHandle) {
-        void* address = GetProcAddress(steamAPIHandle, "SteamAPI_RegisterCallback");
+        void* address = getSymbol(steamAPIHandle, "SteamAPI_RegisterCallback");
         ((void (S_CALLTYPE*)(class CCallbackBase* pCallback, int iCallback))(address))(pCallback, iCallback);
     }
 }
@@ -118,7 +120,7 @@ S_API void S_CALLTYPE SteamAPI_RegisterCallback(class CCallbackBase* pCallback, 
 S_API void S_CALLTYPE SteamAPI_UnregisterCallback(class CCallbackBase* pCallback)
 {
     if (steamAPIHandle) {
-        void* address = GetProcAddress(steamAPIHandle, "SteamAPI_UnregisterCallback");
+        void* address = getSymbol(steamAPIHandle, "SteamAPI_UnregisterCallback");
         ((void (S_CALLTYPE*)(class CCallbackBase* pCallback))(address))(pCallback);
     }
 }
@@ -172,33 +174,30 @@ bool Steam::CheckDLCOwnership(uint8 id)
 bool Steam::InitAPI()
 {
 #if STEAM_API_NODLL
-    char oldWorkingDirectory[MAX_PATH];
-    GetCurrentDirectoryA(MAX_PATH, oldWorkingDirectory);
-    char mainModulePath[MAX_PATH];
-    if (GetModuleFileNameA((HMODULE)ModHandle, mainModulePath, MAX_PATH) == 0)
-    {
-        DisplayError("Failed to get module file name.");
-        return false;
-    }
+    auto oldWorkingDirectory = fs::current_path();
 
-    std::string modulePath = mainModulePath;
-    std::string::size_type slashPos = modulePath.find_last_of("\\/");
-    std::string directory = modulePath.substr(0, slashPos);
-    SetCurrentDirectoryA(directory.c_str());
-    if (!(steamAPIHandle = LoadLibraryA(STEAM_DLL_NAME)))
+    String pathAsString;
+    Mod.GetModPath("RSDKv5SteamAPI", &pathAsString);
+
+    char newWorkingDirectory[256];
+    RSDK.GetCString(newWorkingDirectory, &pathAsString);
+
+    fs::current_path(newWorkingDirectory);
+    if (!(steamAPIHandle = getLibrary(STEAM_DLL_NAME)))
     {
-        DisplayError("Failed to load SteamAPI.");
+        RSDK.PrintLog(PRINT_ERROR, "Failed to load SteamAPI.");
         steamAPIHandle = nullptr;
-        SetCurrentDirectoryA(oldWorkingDirectory);
+        fs::current_path(oldWorkingDirectory);
         return false;
     }
 #endif
 
-    if (!SteamAPI_Init())
+    SteamErrMsg errMsg;
+    if (SteamAPI_InitFlat(&errMsg) != k_ESteamAPIInitResult_OK)
     {
-        RSDK.PrintLog(PRINT_NORMAL, "Failed to initialise the Steam API.");
+        RSDK.PrintLog(PRINT_ERROR, "Failed to initialise the Steam API: %s", errMsg);
 #if STEAM_API_NODLL
-        SetCurrentDirectoryA(oldWorkingDirectory);
+        fs::current_path(oldWorkingDirectory);
 #endif
         return false;
     }
@@ -209,7 +208,7 @@ bool Steam::InitAPI()
             RSDK.PrintLog(PRINT_NORMAL, "Failed to request current stats from Steam.");
     }
 #if STEAM_API_NODLL
-    SetCurrentDirectoryA(oldWorkingDirectory);
+    fs::current_path(oldWorkingDirectory);
 #endif
     return true;
 }

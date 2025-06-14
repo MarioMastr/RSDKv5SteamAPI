@@ -4,6 +4,25 @@
 bool32 EnabledDLC[DLC_COUNT];
 void* ModHandle = nullptr;
 
+// Multiplatform wrappers
+PROC_TYPE getLibrary(const char *fileName)
+{
+#if defined(_WIN32)
+    return LoadLibraryA(fileName);
+#elif defined(__APPLE__)
+    return dlopen(fileName, RTLD_LAZY);
+#endif
+}
+
+void *getSymbol(PROC_TYPE handle, const char *symbolName)
+{
+#if defined(_WIN32)
+    return GetProcAddress(handle, symbolName);
+#elif defined(__APPLE__)
+    return dlsym(handle, symbolName);
+#endif
+}
+
 // Hooks
 install_hook_name(ShowExtensionOverlay, bool32, uint8 overlay)
 {
